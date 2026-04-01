@@ -1,0 +1,19 @@
+[package]
+title = "N-Body Gravity Simulator"
+version = "1.0.0"
+description = "GPU-accelerated N-body gravitational simulation using NVIDIA WARP and Omniverse Fabric."
+category = "Simulation"
+keywords = ["warp", "gpu", "nbody", "gravity", "simulation", "physics"]
+
+[dependencies]
+"omni.kit.uiapp" = {}
+"omni.usd" = {}
+"omni.warp" = {}
+
+[[python.module]]
+name = "sim.warp_nbody"
+
+[[test]]
+dependencies = [
+    "omni.kit.test",
+]
