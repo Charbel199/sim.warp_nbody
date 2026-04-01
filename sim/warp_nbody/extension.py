@@ -4,7 +4,6 @@ import traceback
 import carb
 import omni.ext
 import omni.kit.app
-import numpy as np
 
 from .simulation import NBodySimulation
 from .fabric_bridge import FabricBridge
@@ -84,7 +83,7 @@ class NBodyExtension(omni.ext.IExt):
             self._running = False
 
     def _refresh_stats(self) -> None:
-        active   = int(np.sum(self._sim.active.numpy()))
+        active   = self._sim.count_active()
         merges   = self._initial_n - active
         sim_time = time.monotonic() - self._spawn_time
         self._panel.update_stats(active, merges, sim_time)
