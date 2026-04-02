@@ -1,6 +1,10 @@
 import time
 import traceback
 
+import omni.kit.pipapi
+omni.kit.pipapi.install("nvtx")
+
+import warp as wp
 import carb
 import omni.ext
 import omni.kit.app
@@ -75,8 +79,10 @@ class NBodyExtension(omni.ext.IExt):
         if not self._running:
             return
         try:
-            self._sim.step()
-            self._bridge.mark_dirty()
+            with wp.ScopedTimer("sim.step", use_nvtx=True):
+                self._sim.step()
+            with wp.ScopedTimer("bridge.mark_dirty", use_nvtx=True):
+                self._bridge.mark_dirty()
             self._refresh_stats()
         except Exception as e:
             carb.log_error(f"[warp_nbody] update error: {e}\n{traceback.format_exc()}")

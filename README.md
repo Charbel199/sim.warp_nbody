@@ -22,3 +22,21 @@ All physics runs on the GPU using WARP kernels. Every frame, gravity is computed
 - NVIDIA Omniverse Kit
 - NVIDIA WARP
 - CUDA GPU
+
+
+
+To nsys
+
+
+  nsys launch \
+    --trace=cuda,nvtx \
+    .../kit-app-template/_build/linux-x86_64/release/kit/kit \
+    .../kit-app-template/_build/linux-x86_64/release/apps/my_company.my_usd_composer.kit
+
+  Then once the sim is running:
+
+  nsys start
+  # wait a few seconds...
+  nsys start
+
+  QT_QPA_PLATFORM=xcb nsys-ui .../report1.nsys-rep
