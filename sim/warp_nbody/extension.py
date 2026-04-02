@@ -2,8 +2,36 @@ import time
 import traceback
 
 import omni.kit.pipapi
-omni.kit.pipapi.install("nvtx")
 
+_BSP = "--break-system-packages"
+
+omni.kit.pipapi.install("nvtx", extra_args=[_BSP])
+omni.kit.pipapi.install("h5py", extra_args=[_BSP])
+
+# PyTorch + PyG need CUDA-specific index URLs
+_TORCH_CUDA_INDEX = "https://download.pytorch.org/whl/cu124"
+_PYG_INDEX = "https://data.pyg.org/whl/torch-2.6.0+cu124.html"
+
+omni.kit.pipapi.install(
+    "torch==2.6.0",
+    extra_args=["--index-url", _TORCH_CUDA_INDEX, _BSP],
+)
+omni.kit.pipapi.install(
+    "torch_geometric",
+    extra_args=["--find-links", _PYG_INDEX, _BSP],
+)
+omni.kit.pipapi.install(
+    "torch_scatter",
+    extra_args=["--find-links", _PYG_INDEX, _BSP],
+)
+omni.kit.pipapi.install(
+    "torch_sparse",
+    extra_args=["--find-links", _PYG_INDEX, _BSP],
+)
+omni.kit.pipapi.install(
+    "torch_cluster",
+    extra_args=["--find-links", _PYG_INDEX, _BSP],
+)
 import warp as wp
 import carb
 import omni.ext
@@ -12,7 +40,7 @@ import omni.kit.app
 from .simulation import NBodySimulation
 from .fabric_bridge import FabricBridge
 from .colorizer import ColorManager
-from .instancer import create_instancer, destroy_instancer
+from .instancer import create_instancer, destroy_instancer, create_neural_instancer, destroy_neural_instancer
 from .ui.panel import NBodyPanel, SPAWN_FNS
 
 
@@ -42,6 +70,17 @@ class NBodyExtension(omni.ext.IExt):
 
             create_instancer(n)
 
+            neural_enabled = self._panel.get_neural_enabled()
+            if neural_enabled:
+                checkpoint = self._panel.get_checkpoint_path()
+                self._sim.neural_cutoff = self._panel.get_neural_cutoff()
+                self._sim.neural_inference_interval = self._panel.get_neural_interval()
+                self._sim.set_neural_mode(True, checkpoint)
+                carb.log_info(f"[warp_nbody] Neural mode enabled, cutoff={self._sim.neural_cutoff}, "
+                              f"interval={self._sim.neural_inference_interval}, checkpoint: {checkpoint}")
+            else:
+                self._sim.neural_mode = False
+
             self._sim.G                 = G
             self._sim.softening         = softening
             self._sim.dt                = dt
@@ -52,6 +91,11 @@ class NBodyExtension(omni.ext.IExt):
             self._colorizer.allocate(n)
 
             self._bridge.bind(self._sim, n, self._colorizer)
+
+            if self._sim.neural_mode:
+                create_neural_instancer(n)
+                self._bridge.bind_neural(n)
+                carb.log_info(f"[warp_nbody] Neural instancer created with {n} particles")
 
             self._running    = True
             self._spawn_time = time.monotonic()
@@ -74,15 +118,17 @@ class NBodyExtension(omni.ext.IExt):
             self._colorizer = None
         self._sim.free()
         destroy_instancer()
+        destroy_neural_instancer()
 
     def _on_update(self, _event) -> None:
         if not self._running:
             return
         try:
-            with wp.ScopedTimer("sim.step", use_nvtx=True):
-                self._sim.step()
-            with wp.ScopedTimer("bridge.mark_dirty", use_nvtx=True):
-                self._bridge.mark_dirty()
+            self._sim.step()
+            self._bridge.mark_dirty()
+            neural_pos = self._sim.get_neural_positions()
+            if neural_pos is not None:
+                self._bridge.write_neural_positions(neural_pos)
             self._refresh_stats()
         except Exception as e:
             carb.log_error(f"[warp_nbody] update error: {e}\n{traceback.format_exc()}")
