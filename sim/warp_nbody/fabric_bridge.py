@@ -3,26 +3,11 @@ from usdrt import Usd, Sdf, Vt
 import omni.usd
 
 from .instancer import INSTANCER_PATH
+from .kernels.visual import kernel_compute_scales
 
 _VISUAL_SCALE_REF = 3.0   # scale at reference body count
 _VISUAL_CAP_REF   = 15.0  # cap at reference body count
 _N_REF            = 1000  # reference body count
-
-
-@wp.kernel
-def kernel_compute_scales(
-    radii:   wp.array(dtype=float),
-    active:  wp.array(dtype=int),
-    scales:  wp.array(dtype=wp.vec3),
-    v_scale: float,
-    v_cap:   float,
-):
-    i = wp.tid()
-    if active[i] == 0:
-        scales[i] = wp.vec3(0.0, 0.0, 0.0)
-        return
-    r = wp.min(radii[i] * v_scale, v_cap)
-    scales[i] = wp.vec3(r, r, r)
 
 
 class FabricBridge:
