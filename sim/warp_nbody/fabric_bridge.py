@@ -65,7 +65,7 @@ class FabricBridge:
             self._pos_attr.Set(Vt.Vec3fArray(sim.positions))
             self._scale_attr.Set(Vt.Vec3fArray(self._scales_wp))
             self._color_attr.Set(Vt.Vec3fArray(self._colors_wp))
-            wp.synchronize_device("cuda:0")
+         #   wp.synchronize_device("cuda:0")
 
     def mark_dirty(self) -> None:
         if self._sim is None:
@@ -89,7 +89,7 @@ class FabricBridge:
             self._scale_attr.Set(Vt.Vec3fArray(self._scales_wp))
             self._color_attr.Set(Vt.Vec3fArray(self._colors_wp))
 
-        wp.synchronize_device("cuda:0")
+        #wp.synchronize_device("cuda:0")
 
     def unbind(self) -> None:
         self._sim        = None
