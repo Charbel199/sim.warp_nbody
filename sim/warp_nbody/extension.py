@@ -126,9 +126,8 @@ class NBodyExtension(omni.ext.IExt):
         try:
             self._sim.step()
             self._bridge.mark_dirty()
-            neural_pos = self._sim.get_neural_positions()
-            if neural_pos is not None:
-                self._bridge.write_neural_positions(neural_pos)
+            if self._sim.pos_neural is not None:
+                self._bridge.write_neural(self._sim)
             self._refresh_stats()
         except Exception as e:
             carb.log_error(f"[warp_nbody] update error: {e}\n{traceback.format_exc()}")
@@ -138,7 +137,16 @@ class NBodyExtension(omni.ext.IExt):
         active   = self._sim.count_active()
         merges   = self._initial_n - active
         sim_time = time.monotonic() - self._spawn_time
-        self._panel.update_stats(active, merges, sim_time)
+
+        neural_active = 0
+        neural_merges = 0
+        pos_error = 0.0
+        if self._sim.neural_mode and self._sim.pos_neural is not None:
+            neural_active = self._sim.count_active_neural()
+            neural_merges = self._initial_n - neural_active
+            pos_error = self._sim.get_position_error()
+
+        self._panel.update_stats(active, merges, sim_time, neural_active, neural_merges, pos_error)
 
     def on_shutdown(self) -> None:
         if getattr(self, "_running", False):

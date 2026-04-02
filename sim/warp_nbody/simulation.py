@@ -39,6 +39,10 @@ class NBodySimulation:
         self.pos_neural:        wp.array | None = None
         self.vel_neural:        wp.array | None = None
         self.forces_neural:     wp.array | None = None
+        self.active_neural:     wp.array | None = None
+        self.masses_neural:     wp.array | None = None
+        self.radii_neural:      wp.array | None = None
+        self._neural_active_count: wp.array | None = None
         self._neural_ff = None
         self.neural_inference_interval: int = 10
         self.neural_cutoff: float = 2.0
@@ -74,6 +78,10 @@ class NBodySimulation:
             self.pos_neural    = wp.array(positions_np,  dtype=wp.vec3, device="cuda")
             self.vel_neural    = wp.array(velocities_np, dtype=wp.vec3, device="cuda")
             self.forces_neural = wp.zeros(n, dtype=wp.vec3, device="cuda")
+            self.active_neural = wp.ones(n, dtype=int, device="cuda")
+            self.masses_neural = wp.array(masses_np, dtype=float, device="cuda")
+            self.radii_neural  = wp.array(radii_np, dtype=float, device="cuda")
+            self._neural_active_count = wp.zeros(1, dtype=int, device="cuda")
 
     def free(self) -> None:
         self.positions     = None
@@ -88,9 +96,12 @@ class NBodySimulation:
         self.pos_neural    = None
         self.vel_neural    = None
         self.forces_neural = None
+        self.active_neural = None
+        self.masses_neural = None
+        self.radii_neural  = None
+        self._neural_active_count = None
 
     def count_active(self) -> int:
-        # returns the number of active bodies. copies only 1 int from GPU -> CPU
         if self.active is None:
             return 0
         wp.launch(kernel_reset_int,    dim=1,       device="cuda", inputs=[self._active_count])
@@ -98,6 +109,15 @@ class NBodySimulation:
             self.active, self._active_count,
         ])
         return int(self._active_count.numpy()[0])
+
+    def count_active_neural(self) -> int:
+        if self.active_neural is None:
+            return 0
+        wp.launch(kernel_reset_int,    dim=1,       device="cuda", inputs=[self._neural_active_count])
+        wp.launch(kernel_count_active, dim=self._n, device="cuda", inputs=[
+            self.active_neural, self._neural_active_count,
+        ])
+        return int(self._neural_active_count.numpy()[0])
 
     def step(self) -> None:
         if self.positions is None:
@@ -119,12 +139,14 @@ class NBodySimulation:
         if self.neural_mode and self._neural_ff is not None and self.pos_neural is not None:
             if self._frame % self.neural_inference_interval == 0:
                 self.forces_neural = self._neural_ff.compute_forces(
-                    self.pos_neural, self.vel_neural, self.masses,
+                    self.pos_neural, self.vel_neural, self.masses_neural,
                 )
             wp.launch(kernel_integrate, dim=self._n, device="cuda", inputs=[
                 self.pos_neural, self.vel_neural, self.forces_neural,
-                self.masses, self.active, self.dt,
+                self.masses_neural, self.active_neural, self.dt,
             ])
+            if self.accretion_enabled and self._frame % self.accretion_interval == 0:
+                self._run_accrete_neural()
             wp.synchronize()
             t_neural = time.perf_counter()
 
@@ -166,12 +188,25 @@ class NBodySimulation:
             self.masses, self.radii, self.active, merge_into, BASE_MASS, BASE_RADIUS,
         ])
 
+    def _run_accrete_neural(self) -> None:
+        merge_into = wp.full(self._n, -1, dtype=int, device="cuda")
+        wp.launch(kernel_accrete_pass1, dim=self._n, device="cuda", inputs=[
+            self.pos_neural, self.masses_neural, self.radii_neural,
+            self.active_neural, merge_into, self._n,
+        ])
+        wp.launch(kernel_accrete_pass2, dim=self._n, device="cuda", inputs=[
+            self.masses_neural, self.radii_neural, self.active_neural,
+            merge_into, BASE_MASS, BASE_RADIUS,
+        ])
+
     def get_neural_positions(self) -> wp.array | None:
         return self.pos_neural
 
     def get_position_error(self) -> float:
         if self.pos_neural is None or self.positions is None:
             return 0.0
+        if self.accretion_enabled:
+            return -1.0
         import torch
         pos_c = wp.to_torch(self.positions)
         pos_n = wp.to_torch(self.pos_neural)

@@ -101,16 +101,32 @@ class NBodyPanel:
     def _build_stats_panel(self) -> None:
         ui.Separator()
         with ui.VStack(spacing=2, height=0):
-            for key, label in [("active", "Active Bodies"), ("merges", "Merges"), ("sim_time", "Sim Time")]:
+            for key, label in [
+                ("active", "Classical Active"),
+                ("merges", "Classical Merges"),
+                ("neural_active", "Neural Active"),
+                ("neural_merges", "Neural Merges"),
+                ("pos_error_stat", "Position Error (L2)"),
+                ("sim_time", "Sim Time"),
+            ]:
                 with ui.HStack(height=16):
                     ui.Label(label, width=ui.Fraction(1))
                     lbl = ui.Label("—", alignment=ui.Alignment.RIGHT_CENTER)
                     self._stats_labels[key] = lbl
 
-    def update_stats(self, active: int, merges: int, sim_time: float) -> None:
-        self._stats_labels["active"].text   = str(active)
-        self._stats_labels["merges"].text   = str(merges)
-        self._stats_labels["sim_time"].text = f"{sim_time:.1f} s"
+    def update_stats(self, active: int, merges: int, sim_time: float,
+                     neural_active: int = 0, neural_merges: int = 0, pos_error: float = 0.0) -> None:
+        self._stats_labels["active"].text         = str(active)
+        self._stats_labels["merges"].text         = str(merges)
+        self._stats_labels["neural_active"].text  = str(neural_active) if neural_active > 0 else "—"
+        self._stats_labels["neural_merges"].text  = str(neural_merges) if neural_active > 0 else "—"
+        if neural_active == 0:
+            self._stats_labels["pos_error_stat"].text = "—"
+        elif pos_error < 0:
+            self._stats_labels["pos_error_stat"].text = "N/A (accretion)"
+        else:
+            self._stats_labels["pos_error_stat"].text = f"{pos_error:.4f}"
+        self._stats_labels["sim_time"].text       = f"{sim_time:.1f} s"
 
     def _build_neural_section(self) -> None:
         self._neural_enabled_model = ui.SimpleBoolModel(False)

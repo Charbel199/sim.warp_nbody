@@ -82,6 +82,7 @@ class FabricBridge:
     def bind_neural(self, n_bodies: int) -> None:
         self._neural_n = n_bodies
         self._neural_pos_wp = wp.zeros(n_bodies, dtype=wp.vec3, device="cuda:0")
+        self._neural_scales_wp = wp.zeros(n_bodies, dtype=wp.vec3, device="cuda:0")
 
         if self._rt_stage is None:
             stage_id = omni.usd.get_context().get_stage_id()
@@ -89,20 +90,29 @@ class FabricBridge:
 
         prim = self._rt_stage.GetPrimAtPath(Sdf.Path(NEURAL_INSTANCER_PATH))
         self._neural_pos_attr = prim.GetAttribute("positions")
+        self._neural_scale_attr = prim.GetAttribute("scales")
 
         with wp.ScopedDevice("cuda:0"):
             self._neural_pos_attr.Set(Vt.Vec3fArray(self._neural_pos_wp))
+            self._neural_scale_attr.Set(Vt.Vec3fArray(self._neural_scales_wp))
 
-    def write_neural_positions(self, pos_neural_wp: wp.array) -> None:
+    def write_neural(self, sim) -> None:
         if self._neural_pos_attr is None:
             return
         with wp.ScopedDevice("cuda:0"):
-            wp.copy(self._neural_pos_wp, pos_neural_wp)
+            wp.copy(self._neural_pos_wp, sim.pos_neural)
+            wp.launch(kernel_compute_scales, dim=self._neural_n, device="cuda:0", inputs=[
+                sim.radii_neural, sim.active_neural, self._neural_scales_wp,
+                self._visual_scale, self._visual_cap,
+            ])
             self._neural_pos_attr.Set(Vt.Vec3fArray(self._neural_pos_wp))
+            self._neural_scale_attr.Set(Vt.Vec3fArray(self._neural_scales_wp))
 
     def unbind_neural(self) -> None:
         self._neural_pos_wp = None
+        self._neural_scales_wp = None
         self._neural_pos_attr = None
+        self._neural_scale_attr = None
         self._neural_n = 0
 
     def unbind(self) -> None:
