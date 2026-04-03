@@ -8,7 +8,10 @@ def _spatial_scale(n: int) -> float:
 
 
 # spawn a big planet and a disk of smaller objects around
-def spawn_galaxy_disk(n, radius, central_mass, body_mass, G=0.001, spread=1.0):
+def spawn_galaxy_disk(n, radius, central_mass=None, body_mass=1.0, G=0.001, spread=1.0):
+    # default central mass scales with G so G*M = 0.001*1e6 = 1000
+    if central_mass is None:
+        central_mass = 1000.0 / G
     rng    = np.random.default_rng(seed=42)
     radius = radius * _spatial_scale(n) * spread
 
@@ -48,12 +51,13 @@ def spawn_sphere(n, radius, body_mass, speed_scale, spread=1.0):
     return positions, velocities, masses
 
 # spawn a solar system
-def spawn_solar_system(n, G=0.001, spread=1.0):
+def spawn_solar_system(n, G=0.001, spread=1.0, star_mass=None):
     rng = np.random.default_rng(seed=42)
 
-    # star mass chosen so physics collision radius (~6.5 u) sits well inside
-    # the innermost planet orbit (20 u), keeping all planets alive.
-    star_mass = 10_000.0
+    # default star mass scales with G so the product G*M (and thus orbits)
+    # stays constant: G*M = 0.001*10_000 = 10 regardless of G.
+    if star_mass is None:
+        star_mass = 10.0 / G
 
     # 8 planets: 4 rocky inner, 4 gas/ice outer (masses scaled for visibility) TODO: Will add some more examples
     planet_orbits = np.array([20, 30, 42, 55, 88, 118, 150, 180], dtype=np.float32)
@@ -102,7 +106,10 @@ def spawn_random(n, extent, body_mass, speed_scale, spread=1.0):
     return positions, velocities, masses
 
 # spawn 2 galaxy disks
-def spawn_binary_galaxy(n, radius=40.0, central_mass=1e6, body_mass=1.0, G=0.001, spread=1.0):
+def spawn_binary_galaxy(n, radius=40.0, central_mass=None, body_mass=1.0, G=0.001, spread=1.0):
+    # default central mass scales with G so G*M = 0.001*1e6 = 1000
+    if central_mass is None:
+        central_mass = 1000.0 / G
     rng    = np.random.default_rng(seed=42)
     radius = radius * _spatial_scale(n) * spread
     half   = n // 2
@@ -139,7 +146,10 @@ def spawn_binary_galaxy(n, radius=40.0, central_mass=1e6, body_mass=1.0, G=0.001
     )
 
 # spawn a backhole, not working yet, will be a cool concept once everything is setup
-def spawn_black_hole(n, bh_mass=1e9, body_mass=1.0, max_radius=80.0, G=0.001, spread=1.0):
+def spawn_black_hole(n, bh_mass=None, body_mass=1.0, max_radius=80.0, G=0.001, spread=1.0):
+    # default bh_mass scales with G so G*M = 0.001*1e9 = 1e6
+    if bh_mass is None:
+        bh_mass = 1e6 / G
     rng        = np.random.default_rng(seed=42)
     scale      = _spatial_scale(n) * spread
     max_radius = max_radius * scale

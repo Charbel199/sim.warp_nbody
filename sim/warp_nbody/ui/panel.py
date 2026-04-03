@@ -12,7 +12,7 @@ from ..spawner import (
 PRESETS = ["Galaxy Disk", "Sphere", "Solar System", "Random", "Binary Galaxy", "Black Hole"]
 
 SPAWN_FNS = {
-    "Galaxy Disk":   lambda n, G, spread, body_mass: spawn_galaxy_disk(n, radius=50.0, central_mass=1e6, body_mass=body_mass, G=G, spread=spread),
+    "Galaxy Disk":   lambda n, G, spread, body_mass: spawn_galaxy_disk(n, radius=50.0, body_mass=body_mass, G=G, spread=spread),
     "Sphere":        lambda n, G, spread, body_mass: spawn_sphere(n, radius=50.0, body_mass=body_mass, speed_scale=0.5, spread=spread),
     "Solar System":  lambda n, G, spread, body_mass: spawn_solar_system(n, G=G, spread=spread),
     "Random":        lambda n, G, spread, body_mass: spawn_random(n, extent=100.0, body_mass=body_mass, speed_scale=1.0, spread=spread),
@@ -39,6 +39,7 @@ class NBodyPanel:
     def build(self, on_spawn, on_stop) -> None:
         self._window = ui.Window("N-Body Gravity Simulator", width=340, height=560)
         with self._window.frame:
+          with ui.ScrollingFrame():
             with ui.VStack(spacing=8, height=0):
                 self._build_preset_row()
                 self._build_int_slider("Body Count",     self._n_model,        100,   50000)
@@ -123,17 +124,17 @@ class NBodyPanel:
             ]:
                 with ui.HStack(height=16):
                     ui.Label(label, width=ui.Fraction(1))
-                    lbl = ui.Label("—", alignment=ui.Alignment.RIGHT_CENTER)
+                    lbl = ui.Label("-", alignment=ui.Alignment.RIGHT_CENTER)
                     self._stats_labels[key] = lbl
 
     def update_stats(self, active: int, merges: int, sim_time: float,
                      neural_active: int = 0, neural_merges: int = 0, pos_error: float = 0.0) -> None:
         self._stats_labels["active"].text         = str(active)
         self._stats_labels["merges"].text         = str(merges)
-        self._stats_labels["neural_active"].text  = str(neural_active) if neural_active > 0 else "—"
-        self._stats_labels["neural_merges"].text  = str(neural_merges) if neural_active > 0 else "—"
+        self._stats_labels["neural_active"].text  = str(neural_active) if neural_active > 0 else "-"
+        self._stats_labels["neural_merges"].text  = str(neural_merges) if neural_active > 0 else "-"
         if neural_active == 0:
-            self._stats_labels["pos_error_stat"].text = "—"
+            self._stats_labels["pos_error_stat"].text = "-"
         elif pos_error < 0:
             self._stats_labels["pos_error_stat"].text = "N/A (accretion)"
         else:
@@ -166,9 +167,9 @@ class NBodyPanel:
 
                 ui.Separator()
                 for key, label in [
-                    ("classical_ms", "Classical: — ms/step"),
-                    ("neural_ms", "Neural: — ms/step"),
-                    ("pos_error", "Position Error: —"),
+                    ("classical_ms", "Classical: - ms/step"),
+                    ("neural_ms", "Neural: - ms/step"),
+                    ("pos_error", "Position Error: -"),
                 ]:
                     lbl = ui.Label(label, height=16)
                     self._neural_labels[key] = lbl
@@ -192,13 +193,17 @@ class NBodyPanel:
         import argparse
         import pathlib
 
-        data_path = str(pathlib.Path(__file__).resolve().parents[3] / "data" / "nbody_dataset.h5")
-        checkpoint_dir = str(pathlib.Path(__file__).resolve().parents[3] / "checkpoints")
+        preset = self._selected_preset
+        slug = preset.lower().replace(" ", "_")
+
+        from ..neural.data_gen import dataset_path_for_preset
+        data_path = dataset_path_for_preset(preset)
+        checkpoint_dir = str(pathlib.Path(__file__).resolve().parents[3] / "checkpoints" / slug)
 
         def _run():
             try:
                 from ..neural.train import train
-                self._neural_labels["pos_error"].text = "Training..."
+                self._neural_labels["pos_error"].text = f"Training [{preset}]..."
                 args = argparse.Namespace(
                     epochs=100,
                     batch_size=32,
@@ -207,8 +212,7 @@ class NBodyPanel:
                     output=checkpoint_dir,
                 )
                 train(args)
-                self._neural_labels["pos_error"].text = "Training complete"
-                # Auto-update checkpoint path to the trained model
+                self._neural_labels["pos_error"].text = f"Training complete [{preset}]"
                 best_path = str(pathlib.Path(checkpoint_dir) / "model_best.pt")
                 self._checkpoint_path_model.set_value(best_path)
             except Exception as e:
@@ -218,13 +222,14 @@ class NBodyPanel:
 
     def _on_generate_data(self) -> None:
         import threading
+        preset = self._selected_preset
 
         def _run():
             try:
                 from ..neural.data_gen import generate_dataset, DataGenConfig
-                self._neural_labels["pos_error"].text = "Generating data..."
-                generate_dataset(DataGenConfig())
-                self._neural_labels["pos_error"].text = "Data generation complete"
+                self._neural_labels["pos_error"].text = f"Generating data [{preset}]..."
+                generate_dataset(DataGenConfig(PRESET=preset))
+                self._neural_labels["pos_error"].text = f"Data generation complete [{preset}]"
             except Exception as e:
                 self._neural_labels["pos_error"].text = f"Data gen error: {e}"
 

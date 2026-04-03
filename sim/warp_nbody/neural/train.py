@@ -53,7 +53,7 @@ def train(args: argparse.Namespace) -> None:
     n_train = int(0.8 * n_total)
     n_val = n_total - n_train
     train_ds, val_ds = random_split(dataset, [n_train, n_val])
-    print(f"[train] Dataset loaded in {time.time() - t0:.1f}s — {n_total} frames ({n_train} train / {n_val} val)")
+    print(f"[train] Dataset loaded in {time.time() - t0:.1f}s - {n_total} frames ({n_train} train / {n_val} val)")
 
     from torch_geometric.loader import DataLoader as PyGDataLoader
     train_loader = PyGDataLoader(train_ds, batch_size=args.batch_size, shuffle=True)
