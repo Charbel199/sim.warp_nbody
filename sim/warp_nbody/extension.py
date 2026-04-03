@@ -9,11 +9,11 @@ omni.kit.pipapi.install("nvtx", extra_args=[_BSP])
 omni.kit.pipapi.install("h5py", extra_args=[_BSP])
 
 # PyTorch + PyG need CUDA-specific index URLs
-_TORCH_CUDA_INDEX = "https://download.pytorch.org/whl/cu124"
-_PYG_INDEX = "https://data.pyg.org/whl/torch-2.6.0+cu124.html"
+_TORCH_CUDA_INDEX = "https://download.pytorch.org/whl/cu128"
+_PYG_INDEX = "https://data.pyg.org/whl/torch-2.7.0+cu128.html"
 
 omni.kit.pipapi.install(
-    "torch==2.6.0",
+    "torch==2.7.0",
     extra_args=["--index-url", _TORCH_CUDA_INDEX, _BSP],
 )
 omni.kit.pipapi.install(
