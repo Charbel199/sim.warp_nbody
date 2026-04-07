@@ -196,9 +196,13 @@ Equal-mass bodies in a uniform random sphere. No central mass, just everything p
 - **Random** - bodies scattered in a box
 - **Binary Galaxy** - two galaxy disks colliding
 
-## [EXPERIMENTAL] Neural Force Field
+## [EXPERIMENTAL] AI Physics
 
-A GNN tries to approximate the N-body gravitational forces and runs next to the classical simulation for comparison. Blue particles are the classical solver, orange particles are the neural one. Both start from the same initial conditions.
+The idea here comes from surrogate modeling in scientific computing. Instead of solving the full equations every timestep, you train a neural network to approximate the solver and use that as a cheap stand-in. NVIDIA's NeMo Physics does this at scale for things like CFD and weather prediction, training models (FourCastNet, MeshGraphNet, etc.) on simulation data and then running inference orders of magnitude faster than the original PDE solver.
+
+This is the same concept applied to N-body gravity. The classical O(N^2) force computation is expensive, so we train a GNN on recorded simulation data and see if it can predict the per-particle accelerations well enough to be useful. It won't match NeMo Physics in accuracy or scale, but it's a good sandbox to play with the idea of surrogate models inside a live simulation.
+
+The GNN runs next to the classical simulation for comparison. Blue particles are the classical solver, orange particles are the neural one. Both start from the same initial conditions.
 
 ![neural physics](docs/galaxy_disk_neural_physics.gif)
 
