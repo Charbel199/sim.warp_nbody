@@ -8,22 +8,33 @@ GPU-accelerated N-body gravitational simulation running inside NVIDIA Omniverse,
 
 All physics runs on the GPU using WARP kernels. Every frame, gravity is computed between all pairs of bodies (O(N^2)), velocities and positions are integrated, and overlapping bodies merge together. The goal is for nothing to leave the GPU.
 
-## Neural Force Field
+## [EXPERIMENTAL] Neural Force Field
 
-A GNN (Graph Neural Network) can approximate the N-body forces and run side-by-side with the classical simulation for comparison.
+> **This feature is experimental.** The GNN can learn reasonable force approximations for individual presets, but accuracy varies across configurations and it is not yet a drop-in replacement for the classical solver. Treat it as a research sandbox for exploring learned physics.
 
-**Pipeline:**
-1. **Generate data** - runs the classical simulation and records positions, velocities, masses, and accelerations to HDF5
-2. **Train** - trains a GNS-style GNN (3 message-passing rounds, radius graph) on the recorded data
-3. **Inference** - the trained model predicts forces via zero-copy Warp-to-PyTorch bridge
+A GNN (Graph Neural Network) attempts to approximate the N-body gravitational forces and runs side-by-side with the classical simulation for comparison. The idea is to see whether a lightweight graph network can learn the force field well enough to be useful as a fast surrogate - trading exactness for speed.
 
-**Architecture:** Node encoder (vel + mass) and edge encoder (relative pos + distance + relative vel) feed into 3 message-passing layers with residual connections, decoded to per-particle accelerations (simplest format I could find online).
+**Pipeline (per-preset):**
+
+Each preset (Galaxy Disk, Sphere, Solar System, etc.) has its own data/training/checkpoint pipeline, since the dynamics and mass scales differ significantly between setups.
+
+1. **Select a preset** in the UI
+2. **Generate data** - runs the classical simulation for that preset and records positions, velocities, masses, and accelerations to HDF5 (`data/nbody_{preset}.h5`)
+3. **Train** - trains a GNS-style GNN on the recorded data, saving checkpoints to `checkpoints/{preset}/`
+4. **Inference** - load the trained model and the GNN predicts forces via zero-copy Warp-to-PyTorch bridge
+
+**Architecture:** Node encoder (vel + mass) and edge encoder (relative pos + distance + relative vel) feed into 3 message-passing layers with residual connections, decoded to per-particle accelerations.
 
 **Dual-stream mode:** When enabled, both classical (blue) and neural (orange) particles spawn from identical initial conditions. The position error between them is logged every 100 frames.
 
 **Tunable parameters:**
 - **Cutoff radius** - controls the radius graph size (smaller = faster, less accurate)
 - **Inference interval** - run the GNN every K frames and reuse cached forces in between
+
+**Known limitations:**
+- Models trained on one preset don't generalize to others (by design - each preset has different mass scales and dynamics)
+- High-mass-ratio systems (Solar System, Black Hole) are harder to learn than uniform-mass setups (Sphere, Random)
+- The model can drift over long rollouts since errors accumulate; the dual-stream comparison makes this visible
 
 ## Presets
 
